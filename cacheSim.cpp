@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 		cerr << "File not found" << endl;
 		return 0;
 	}
-
+//
 	unsigned MemCyc = 0, BSize = 0, L1Size = 0, L2Size = 0, L1Assoc = 0,
 			L2Assoc = 0, L1Cyc = 0, L2Cyc = 0, WrAlloc = 0;
 
