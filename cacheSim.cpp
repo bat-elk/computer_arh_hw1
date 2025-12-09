@@ -11,6 +11,8 @@ using std::cerr;
 using std::ifstream;
 using std::stringstream;
 
+uint64_t g_lru_counter = 0; //Global LRU counter
+
 int main(int argc, char **argv) {
 
 	if (argc < 19) {
