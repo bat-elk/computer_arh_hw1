@@ -1,4 +1,5 @@
-#include <cache.cpp>
+#include <cache.h>
+
 extern uint64_t g_lru_counter;
 class L1Cache : public Cache {
 private:

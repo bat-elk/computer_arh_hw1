@@ -1,15 +1,18 @@
-#include <cache.cpp>
+#include <cache.h>
 
+class L1Cache;
 extern uint64_t g_lru_counter;
-
+extern uint64_t total_mem_writes;
 class L2Cache : public Cache {
 private:
     int mem_cycles; //DRAM accecss time
+    L1Cache* L1_cache_ptr = nullptr;
 
 public:
-    L2Cache(int size_log2, int block_size_log2, int assoc_log2, int cycles, int mem_cyc)
+    L2Cache(int size_log2, int block_size_log2, int assoc_log2, int cycles, int mem_cyc, L1Cache* L1_ptr)
         : Cache(size_log2, block_size_log2, assoc_log2, cycles), 
-          mem_cycles(mem_cyc) { }
+          mem_cycles(mem_cyc),
+          L1_cache_ptr(L1_ptr) { }
 
     // --- Virtual Methods Implementation ---
 
@@ -73,6 +76,63 @@ public:
         }
     }
     
-    // L2 insert handles Write Allocate and Write Back policy (setting dirty bit and finding victim).
-    void insert(uint32_t address, bool is_write) override;
+    void L2Cache::insert(uint32_t address, bool is_write) {
+        
+        AddressInfo info = decomposeAddress(address);
+        uint32_t new_tag = info.tag;
+        uint32_t index = info.index;
+        CacheSet& current_set = sets[index];
+
+        // --- 1. Find the Victim Line (LRU or Invalid) ---
+        int victim_index = -1;
+        uint64_t min_lru = UINT64_MAX; 
+
+        for (int i = 0; i < current_set.lines.size(); ++i) {
+            CacheLine& line = current_set.lines[i];
+            
+            // A. Prefer an invalid line (empty spot)
+            if (!line.valid) {
+                victim_index = i;
+                break; 
+            }
+
+            // B. Find the Least Recently Used line (min lru timestamp)
+            if (line.lru < min_lru) {
+                min_lru = line.lru;
+                victim_index = i;
+            }
+        }
+
+        CacheLine& victim_line = current_set.lines[victim_index];
+
+        // --- 2. Handle Eviction and Write Back (if victim is valid) ---
+        if (victim_line.valid) {
+            
+            // A. Handle Inclusive Policy: Invalidate the victim in L1
+            // This requires L2 to have a pointer to L1.
+            if (L1_cache_ptr != nullptr) {
+                // Need to get the full address of the block we are kicking out
+                uint32_t victim_full_address = reconstructAddress(victim_line.tag, index);
+                
+                // Invalidate the block in the L1 Cache.
+                L1_cache_ptr->invalidate_block(victim_full_address); 
+            }
+            
+            // B. Handle Write Back if the victim is Dirty (L2 is Write Back)
+            if (victim_line.dirty) {
+                total_mem_writes++;
+            }
+        }
+
+        // --- 3. Insert the New Block (Always Write Allocate in L2) ---
+        
+        victim_line.valid = true;
+        victim_line.tag = new_tag;
+        
+        // L2 is Write Allocate: if insertion is due to a Write Miss, it starts dirty.
+        victim_line.dirty = is_write; 
+        
+        // Update LRU counter (this block is the most recently used)
+        victim_line.lru = g_lru_counter; 
+    }
 };

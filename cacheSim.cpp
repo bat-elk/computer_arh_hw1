@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "cache.h"
+
 using std::FILE;
 using std::string;
 using std::cout;
@@ -12,6 +14,7 @@ using std::ifstream;
 using std::stringstream;
 
 uint64_t g_lru_counter = 0; //Global LRU counter
+uint64_t total_mem_writes = 0; 
 
 int main(int argc, char **argv) {
 
